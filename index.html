@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>互動式故事書</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        background-color: #000; /* 修改為黑色背景 */
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .book-container {
+        width: 90%;
+        max-width: 1200px;
+        height: 600px;
+        position: relative;
+      }
+
+      .book {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .page {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background: white; /* 頁面維持白色 */
+        border-radius: 10px;
+        box-shadow: 0 10px 50px rgba(255, 255, 255, 0.3); /* 陰影調整為白色 */
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.5s ease-in-out;
+      }
+
+      .page.active {
+        opacity: 1;
+        transform: translateX(0);
+        z-index: 10;
+      }
+
+      .page.prev {
+        transform: translateX(-100%);
+      }
+
+      .page-content {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        height: 100%;
+        position: relative;
+      }
+
+      .image-section {
+        background-color: #f0f0f0; /* 維持淺灰色，以保留對比 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        border-radius: 10px 0 0 10px;
+        overflow: hidden;
+      }
+
+      .text-section {
+        padding: 40px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        position: relative;
+      }
+
+      .upload-area {
+        width: 80%;
+        height: 80%;
+        border: 3px dashed #ccc;
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        position: relative;
+      }
+
+      .upload-area:hover {
+        border-color: #fff; /* 懸停時邊框改為白色 */
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .upload-area img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        border-radius: 10px;
+      }
+
+      .upload-icon {
+        font-size: 48px;
+        color: #ccc;
+        margin-bottom: 10px;
+      }
+
+      .upload-text {
+        color: #666;
+        text-align: center;
+      }
+
+      .text-input {
+        width: 100%;
+        height: 100%;
+        border: none;
+        resize: none;
+        font-size: 18px;
+        line-height: 1.8;
+        padding: 20px;
+        background: transparent;
+        font-family: inherit;
+      }
+
+      .text-input:focus {
+        outline: none;
+      }
+
+      .controls {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 20px;
+        z-index: 100;
+      }
+
+      .btn {
+        padding: 12px 24px;
+        background: white;
+        color: black; /* 按鈕文字改為黑色 */
+        border: none;
+        border-radius: 25px;
+        font-size: 16px;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2); /* 陰影調整為白色 */
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(255, 255, 255, 0.3);
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .page-indicator {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(255, 255, 255, 0.9);
+        color: black; /* 指示器文字改為黑色 */
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        z-index: 100;
+      }
+
+      .add-page-btn {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: white; /* 新增按鈕改為白色 */
+        color: black; /* 新增按鈕文字改為黑色 */
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(255, 255, 255, 0.4); /* 陰影調整為白色 */
+        transition: all 0.3s;
+        z-index: 100;
+      }
+
+      .add-page-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 20px rgba(255, 255, 255, 0.6);
+      }
+
+      @media (max-width: 768px) {
+        .page-content {
+          grid-template-columns: 1fr;
+          grid-template-rows: 1fr 1fr;
+        }
+
+        .image-section {
+          border-radius: 10px 10px 0 0;
+        }
+
+        .text-section {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="book-container">
+      <div class="book" id="book"></div>
+
+      <div class="controls">
+        <button class="btn" id="prevBtn" disabled>
+          <span>⬅️</span> 上一頁
+        </button>
+        <button class="btn" id="nextBtn">下一頁 <span>➡️</span></button>
+      </div>
+
+      <div class="page-indicator">
+        第 <span id="currentPage">1</span> / <span id="totalPages">1</span> 頁
+      </div>
+
+      <button class="add-page-btn" id="addPageBtn">+</button>
+    </div>
+
+    <script>
+      // 全域變數
+      let currentPage = 1;
+      let totalPages = 0;
+      let isAnimating = false;
+      const pageData = {};
+
+      // 創建頁面HTML
+      function createPageHTML(pageNum) {
+        return `
+                <div class="page" data-page="${pageNum}">
+                    <div class="page-content">
+                        <div class="image-section">
+                            <input type="file" style="display: none;" id="image-${pageNum}" accept="image/*">
+                            <div class="upload-area" data-page="${pageNum}">
+                                <div class="upload-icon">📷</div>
+                                <div class="upload-text">點擊上傳圖片</div>
+                            </div>
+                        </div>
+                        <div class="text-section">
+                            <textarea class="text-input" placeholder="在這裡輸入您的故事內容..." data-page="${pageNum}"></textarea>
+                        </div>
+                    </div>
+                </div>
+            `;
+      }
+
+      // 初始化
+      function init() {
+        const book = document.getElementById("book");
+
+        // 創建第一頁
+        totalPages = 1;
+        pageData[1] = { image: null, text: "" };
+        book.innerHTML = createPageHTML(1);
+
+        // 顯示第一頁
+        const firstPage = book.querySelector('[data-page="1"]');
+        if (firstPage) {
+          firstPage.classList.add("active");
+        }
+
+        updateUI();
+      }
+
+      // 更新UI
+      function updateUI() {
+        document.getElementById("currentPage").textContent = currentPage;
+        document.getElementById("totalPages").textContent = totalPages;
+        document.getElementById("prevBtn").disabled =
+          currentPage === 1 || isAnimating;
+        document.getElementById("nextBtn").disabled = isAnimating;
+      }
+
+      // 處理圖片上傳
+      function handleImageUpload(file, pageNum) {
+        if (file && file.type.startsWith("image/")) {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            const uploadArea = document.querySelector(
+              `.upload-area[data-page="${pageNum}"]`
+            );
+            if (uploadArea) {
+              uploadArea.innerHTML = `<img src="${e.target.result}" alt="上傳的圖片">`;
+              if (!pageData[pageNum]) pageData[pageNum] = {};
+              pageData[pageNum].image = e.target.result;
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+
+      // 儲存文字
+      function saveCurrentPageText() {
+        const textarea = document.querySelector(
+          `.page[data-page="${currentPage}"] .text-input`
+        );
+        if (textarea) {
+          if (!pageData[currentPage]) pageData[currentPage] = {};
+          pageData[currentPage].text = textarea.value;
+        }
+      }
+
+      // 載入頁面內容
+      function loadPageData(pageNum) {
+        const data = pageData[pageNum];
+        if (!data) return;
+
+        // 載入圖片
+        if (data.image) {
+          const uploadArea = document.querySelector(
+            `.upload-area[data-page="${pageNum}"]`
+          );
+          if (uploadArea) {
+            uploadArea.innerHTML = `<img src="${data.image}" alt="上傳的圖片">`;
+          }
+        }
+
+        // 載入文字
+        if (data.text !== undefined) {
+          const textarea = document.querySelector(
+            `.page[data-page="${pageNum}"] .text-input`
+          );
+          if (textarea) {
+            textarea.value = data.text;
+          }
+        }
+      }
+
+      // 切換到指定頁面
+      function goToPage(targetPage) {
+        if (
+          targetPage < 1 ||
+          targetPage > totalPages ||
+          targetPage === currentPage
+        )
+          return;
+        if (isAnimating) return;
+
+        isAnimating = true;
+        saveCurrentPageText();
+
+        const currentEl = document.querySelector(
+          `.page[data-page="${currentPage}"]`
+        );
+        const targetEl = document.querySelector(
+          `.page[data-page="${targetPage}"]`
+        );
+
+        if (currentEl && targetEl) {
+          // 設定動畫方向
+          if (targetPage > currentPage) {
+            targetEl.classList.remove("prev");
+            currentEl.classList.add("prev");
+          } else {
+            targetEl.classList.add("prev");
+            setTimeout(() => {
+              targetEl.classList.remove("prev");
+              currentEl.classList.remove("prev");
+            }, 50);
+          }
+
+          // 切換active狀態
+          currentEl.classList.remove("active");
+          targetEl.classList.add("active");
+
+          currentPage = targetPage;
+          loadPageData(currentPage);
+
+          setTimeout(() => {
+            isAnimating = false;
+            updateUI();
+          }, 500);
+        } else {
+          isAnimating = false;
+        }
+      }
+
+      // 新增頁面
+      function addNewPage() {
+        saveCurrentPageText();
+        totalPages++;
+
+        const book = document.getElementById("book");
+        const newPageHTML = createPageHTML(totalPages);
+        book.insertAdjacentHTML("beforeend", newPageHTML);
+
+        pageData[totalPages] = { image: null, text: "" };
+        updateUI();
+      }
+
+      // 事件委派
+      document.addEventListener("click", function (e) {
+        // 處理上傳區域點擊
+        if (e.target.closest(".upload-area")) {
+          const uploadArea = e.target.closest(".upload-area");
+          const pageNum = uploadArea.dataset.page;
+          const fileInput = document.getElementById(`image-${pageNum}`);
+          if (fileInput) fileInput.click();
+        }
+      });
+
+      // 處理文件選擇
+      document.addEventListener("change", function (e) {
+        if (e.target.type === "file" && e.target.id.startsWith("image-")) {
+          const pageNum = e.target.id.split("-")[1];
+          handleImageUpload(e.target.files[0], pageNum);
+        }
+      });
+
+      // 處理文字輸入
+      document.addEventListener("input", function (e) {
+        if (e.target.classList.contains("text-input")) {
+          const pageNum = parseInt(e.target.dataset.page);
+          if (!pageData[pageNum]) pageData[pageNum] = {};
+          pageData[pageNum].text = e.target.value;
+        }
+      });
+
+      // 按鈕事件
+      document
+        .getElementById("prevBtn")
+        .addEventListener("click", () => goToPage(currentPage - 1));
+      document.getElementById("nextBtn").addEventListener("click", () => {
+        if (currentPage === totalPages) {
+          addNewPage();
+        }
+        goToPage(currentPage + 1);
+      });
+      document
+        .getElementById("addPageBtn")
+        .addEventListener("click", addNewPage);
+
+      // 初始化應用
+      init();
+    </script>
+  
+<!-- === Persistence & Backup Enhancements (non-intrusive) === -->
+<script>
+(function(){
+  // Guard to avoid double-injection
+  if (window.__storybook_persist_installed__) return;
+  window.__storybook_persist_installed__ = true;
+
+  const STORAGE_KEY = "storybook_v1";
+  const MAX_IMG_WIDTH = 1280;
+  const IMG_QUALITY = 0.8;
+
+  // Utilities
+  function persist() {
+    try {
+      const payload = {
+        currentPage: (typeof currentPage !== "undefined") ? currentPage : 1,
+        totalPages: (typeof totalPages !== "undefined") ? totalPages : (document.querySelectorAll('#book .page').length || 1),
+        pageData: (typeof pageData !== "undefined") ? pageData : collectFromDOM(),
+        savedAt: new Date().toISOString(),
+        version: 1,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch(e) {
+      console.warn("Persist failed:", e);
+      alert("儲存失敗：資料可能超過瀏覽器容量，請改用匯出 JSON 備份或改用 IndexedDB/雲端。");
+    }
+  }
+
+  function collectFromDOM(){
+    // Fallback：從 DOM 收集當前畫面資料（若沒有 pageData 全域變數）
+    const obj = {};
+    document.querySelectorAll('#book .page').forEach(pg => {
+      const num = parseInt(pg.getAttribute('data-page') || "0") || 0;
+      if (!num) return;
+      const textEl = pg.querySelector('.text-input');
+      const imgEl  = pg.querySelector('.upload-area img');
+      obj[num] = {
+        text: textEl ? textEl.value : "",
+        image: imgEl ? imgEl.src : null
+      };
+    });
+    return obj;
+  }
+
+  function restore() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    try {
+      const data = JSON.parse(raw);
+      if (!data || !data.pageData) return false;
+
+      // 如果有全域資料結構，覆蓋它
+      if (typeof window.pageData === "object") {
+        Object.keys(window.pageData).forEach(k=>delete window.pageData[k]);
+        Object.assign(window.pageData, data.pageData);
+      } else {
+        window.pageData = data.pageData;
+      }
+      window.currentPage = data.currentPage || 1;
+      window.totalPages = data.totalPages || Object.keys(window.pageData||{}).length || 1;
+
+      const book = document.getElementById("book");
+      if (book) {
+        // 嘗試用使用者原本的 createPageHTML；若沒有就用 fallback
+        const create = (typeof window.createPageHTML === "function")
+          ? window.createPageHTML
+          : function(i){
+              return `
+              <div class="page" data-page="${i}">
+                <div class="upload-area" data-page="${i}"></div>
+                <textarea class="text-input" data-page="${i}" placeholder="Write your story..."></textarea>
+              </div>`;
+            };
+
+        book.innerHTML = "";
+        for (let i=1;i<=window.totalPages;i++){
+          book.insertAdjacentHTML("beforeend", create(i));
+        }
+        // 填入內容
+        for (const [k,v] of Object.entries(window.pageData)){
+          const i = parseInt(k);
+          const pg = book.querySelector(`.page[data-page="${i}"]`);
+          if (!pg) continue;
+          const up = pg.querySelector(".upload-area");
+          if (v && v.image && up) {
+            up.innerHTML = `<img src="${v.image}" alt="上傳的圖片">`;
+          }
+          const tx = pg.querySelector(".text-input");
+          if (tx && v && typeof v.text === "string") {
+            tx.value = v.text;
+          }
+        }
+        // 標記當前頁
+        const active = book.querySelector(`.page[data-page="${window.currentPage}"]`);
+        if (active) active.classList.add("active");
+      }
+
+      // 若原本有 updateUI/loadPageData，就調用一次
+      if (typeof window.updateUI === "function") try{ window.updateUI(); }catch(_){}
+      if (typeof window.loadPageData === "function") try{ window.loadPageData(window.currentPage); }catch(_){}
+
+      return true;
+    } catch(e){
+      console.warn("Restore failed:", e);
+      return false;
+    }
+  }
+
+  function compressDataURL(dataURL, maxWidth = MAX_IMG_WIDTH, quality = IMG_QUALITY){
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        const out = canvas.toDataURL("image/jpeg", quality);
+        resolve(out);
+      };
+      img.src = dataURL;
+    });
+  }
+
+  // Wrap existing functions if they exist
+  // 1) saveCurrentPageText
+  if (typeof window.saveCurrentPageText === "function") {
+    const _origSave = window.saveCurrentPageText;
+    window.saveCurrentPageText = function(){
+      const r = _origSave.apply(this, arguments);
+      try{ persist(); }catch(_){}
+      return r;
+    };
+  }
+
+  // 2) handleImageUpload —— 改為壓縮後再存
+  if (typeof window.handleImageUpload === "function") {
+    // Replace with compressing version; we can't easily call original because we need to swap the dataURL.
+    window.handleImageUpload = async function(file, pageNum){
+      if (file && file.type && file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const compressed = await compressDataURL(e.target.result);
+          const uploadArea = document.querySelector(`.upload-area[data-page="${pageNum}"]`)
+                             || document.querySelector(`.page[data-page="${pageNum}"] .upload-area`);
+          if (uploadArea) {
+            uploadArea.innerHTML = `<img src="${compressed}" alt="上傳的圖片">`;
+          }
+          if (typeof window.pageData !== "object") window.pageData = {};
+          if (!window.pageData[pageNum]) window.pageData[pageNum] = {};
+          window.pageData[pageNum].image = compressed;
+          try{ persist(); }catch(_){}
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+  }
+
+  // 3) addNewPage
+  if (typeof window.addNewPage === "function") {
+    const _origAdd = window.addNewPage;
+    window.addNewPage = function(){
+      const r = _origAdd.apply(this, arguments);
+      try{ persist(); }catch(_){}
+      return r;
+    };
+  }
+
+  // 4) goToPage
+  if (typeof window.goToPage === "function") {
+    const _origGo = window.goToPage;
+    window.goToPage = function(){
+      const r = _origGo.apply(this, arguments);
+      try{ persist(); }catch(_){}
+      return r;
+    };
+  }
+
+  // 5) 文字輸入時即時保存（事件委派）
+  document.addEventListener("input", function(e){
+    if (e.target && e.target.classList && e.target.classList.contains("text-input")) {
+      const pageNum = parseInt(e.target.dataset.page || e.target.closest(".page")?.getAttribute("data-page") || "0");
+      if (pageNum) {
+        if (typeof window.pageData !== "object") window.pageData = {};
+        if (!window.pageData[pageNum]) window.pageData[pageNum] = {};
+        window.pageData[pageNum].text = e.target.value;
+        try{ persist(); }catch(_){}
+      }
+    }
+  });
+
+  // Add floating controls (DOM)
+  function ensureControls(){
+    if (document.getElementById("storybook-persist-controls")) return;
+    const box = document.createElement("div");
+    box.id = "storybook-persist-controls";
+    box.style.position = "fixed";
+    box.style.top = "20px";
+    box.style.left = "20px";
+    box.style.zIndex = "9999";
+    box.style.display = "flex";
+    box.style.gap = "8px";
+    box.style.flexWrap = "wrap";
+
+    function mkBtn(label){
+      const b = document.createElement("button");
+      b.className = "btn";
+      b.textContent = label;
+      b.style.padding = "8px 12px";
+      b.style.borderRadius = "8px";
+      b.style.border = "1px solid rgba(0,0,0,0.15)";
+      b.style.background = "rgba(255,255,255,0.85)";
+      b.style.backdropFilter = "blur(6px)";
+      b.style.cursor = "pointer";
+      return b;
+    }
+
+    const saveBtn = mkBtn("💾 儲存");
+    const exportBtn = mkBtn("⬇️ 匯出JSON");
+    const importLabel = mkBtn("⬆️ 匯入JSON");
+    const clearBtn = mkBtn("🗑️ 清空");
+
+    const file = document.createElement("input");
+    file.type = "file";
+    file.accept = "application/json";
+    file.style.display = "none";
+
+    importLabel.addEventListener("click", ()=> file.click());
+    file.addEventListener("change", async (e)=>{
+      const f = e.target.files?.[0];
+      if (!f) return;
+      const text = await f.text();
+      localStorage.setItem(STORAGE_KEY, text);
+      const ok = restore();
+      if (!ok) alert("匯入失敗或檔案格式不正確。");
+    });
+
+    saveBtn.addEventListener("click", persist);
+
+    exportBtn.addEventListener("click", ()=>{
+      const blob = new Blob([localStorage.getItem(STORAGE_KEY) || "{}"], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `storybook-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    clearBtn.addEventListener("click", ()=>{
+      if (confirm("確定要清空所有已保存的故事與圖片嗎？此操作無法復原。")) {
+        localStorage.removeItem(STORAGE_KEY);
+        location.reload();
+      }
+    });
+
+    box.append(saveBtn, exportBtn, importLabel, file, clearBtn);
+    document.body.appendChild(box);
+  }
+
+  document.addEventListener("DOMContentLoaded", function(){
+    ensureControls();
+    // 嘗試還原
+    restore();
+    // 在關閉前保一次
+    window.addEventListener("beforeunload", persist);
+  });
+})();
+</script>
+
+</body>
+</html>
